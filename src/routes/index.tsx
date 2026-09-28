@@ -87,11 +87,11 @@ function useLiveAsset(base: Asset) {
 }
 
 function TempoPage() {
-  const [selectedId, setSelectedId] = useState(ASSETS[0].id);
+  const [selectedId, setSelectedId] = useState(ASSETS[0]!.id);
   const [query, setQuery] = useState("");
 
   const selectedBase = useMemo(
-    () => ASSETS.find((a) => a.id === selectedId) ?? ASSETS[0],
+    () => ASSETS.find((a) => a.id === selectedId) ?? ASSETS[0]!,
     [selectedId],
   );
   const asset = useLiveAsset(selectedBase);
