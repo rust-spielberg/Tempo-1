@@ -154,7 +154,7 @@ function TempoPage() {
             <span className="hidden sm:inline">·</span>
             <span>vibe engine v2</span>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ---------------- PLAYGROUND ---------------- */}
