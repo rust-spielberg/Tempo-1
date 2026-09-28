@@ -121,12 +121,7 @@ function TempoPage() {
         <div className="grid-lines pointer-events-none absolute inset-0 opacity-30" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_50%,transparent_0%,var(--background)_100%)]" />
 
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 flex flex-col items-center px-6 text-center"
-        >
+        <div className="animate-in fade-in slide-in-from-bottom-4 relative z-10 flex flex-col items-center px-6 text-center duration-700">
           <span className="panel inline-flex items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
             <span className="relative flex size-2">
               <span className="animate-tempo-pulse absolute inline-flex size-2 rounded-full bg-ice" />
