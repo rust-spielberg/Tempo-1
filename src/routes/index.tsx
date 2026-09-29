@@ -38,9 +38,6 @@ function HomePage() {
           <span className="bg-gradient-to-br from-mono/85 via-panic/65 to-panic/85 bg-clip-text text-transparent">P</span>
           <span className="bg-gradient-to-br from-panic/40 via-panic/70 to-panic-deep bg-clip-text text-transparent">O</span>
         </span>
-        <h1 className="mt-8 max-w-2xl text-balance font-display text-xl font-semibold leading-snug tracking-tight text-mono sm:text-2xl">
-          The whole sky leans towards your cursor.
-        </h1>
         <p className="mt-6 max-w-xl text-balance text-sm leading-relaxed text-mono-dim sm:text-base">
           Translating market chaos and live sentiment telemetry into human emotional metrics.
         </p>
