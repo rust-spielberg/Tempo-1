@@ -6,7 +6,7 @@ import { GravityStars } from "@/components/ui/gravity-stars";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "TEMPO — The whole sky leans towards your cursor" },
+      { title: "TEMPO — Live Market Sentiment Radar" },
       {
         name: "description",
         content:
