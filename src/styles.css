@@ -39,6 +39,9 @@
   --color-ice-deep: var(--ice-deep);
   --color-panic: var(--panic);
   --color-panic-deep: var(--panic-deep);
+  --color-obsidian: var(--obsidian);
+  --color-mono: var(--mono);
+  --color-mono-dim: var(--mono-dim);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-chart-1: var(--ice);
@@ -53,7 +56,10 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.145 0.006 265);
+  --background: oklch(0.1 0.004 265);
+  --obsidian: oklch(0.12 0 0);
+  --mono: oklch(0.98 0 0);
+  --mono-dim: oklch(0.7 0 0);
   --foreground: oklch(0.955 0.005 240);
   --surface: oklch(0.19 0.008 260);
   --surface-raised: oklch(0.228 0.01 258);
@@ -71,7 +77,7 @@
   --accent-foreground: oklch(0.955 0.005 240);
   --destructive: oklch(0.55 0.215 20.5);
   --destructive-foreground: oklch(0.97 0.01 240);
-  --border: oklch(0.268 0.01 258);
+  --border: oklch(0.225 0 0);
   --input: oklch(0.268 0.01 258);
   --ring: oklch(0.898 0.111 200.5);
 

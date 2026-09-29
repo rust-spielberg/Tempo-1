@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
   Brain,
@@ -109,8 +109,9 @@ function PlaygroundPage() {
 
   return (
     <main className="relative min-h-screen">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8"><Link to="/" className="font-display text-sm font-bold tracking-widest-xl text-gradient-ice">TEMPO</Link><span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{ASSETS.length} assets streaming</span></nav>
       {/* ---------------- PLAYGROUND ---------------- */}
-      <section id="terminal" className="relative mx-auto w-full max-w-6xl px-5 py-20 sm:px-8">
+      <section id="terminal" className="relative mx-auto w-full max-w-6xl px-5 py-12 sm:px-8">
         <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.28em] text-ice">
