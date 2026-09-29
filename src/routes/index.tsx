@@ -33,9 +33,9 @@ function HomePage() {
       <div className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none relative z-10 flex flex-col items-center px-6 text-center duration-700">
         <span className="font-display text-7xl font-bold uppercase tracking-[0.18em] sm:text-8xl md:text-9xl">
           <span className="bg-gradient-to-br from-ice-deep via-ice/50 to-ice/20 bg-clip-text text-transparent">T</span>
-          <span className="bg-gradient-to-br from-ice/60 via-ice/30 to-mono/70 bg-clip-text text-transparent">E</span>
+          <span className="bg-gradient-to-br from-ice/95 via-ice/65 to-mono/85 bg-clip-text text-transparent">E</span>
           <span className="text-mono">M</span>
-          <span className="bg-gradient-to-br from-mono/70 via-panic/30 to-panic/60 bg-clip-text text-transparent">P</span>
+          <span className="bg-gradient-to-br from-mono/85 via-panic/65 to-panic/85 bg-clip-text text-transparent">P</span>
           <span className="bg-gradient-to-br from-panic/40 via-panic/70 to-panic-deep bg-clip-text text-transparent">O</span>
         </span>
         <h1 className="mt-8 max-w-2xl text-balance font-display text-xl font-semibold leading-snug tracking-tight text-mono sm:text-2xl">
