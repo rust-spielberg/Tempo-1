@@ -31,8 +31,8 @@ function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_45%_at_50%_50%,transparent_0%,var(--obsidian)_100%)]" />
 
       <div className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none relative z-10 flex flex-col items-center px-6 text-center duration-700">
-        <span className="font-mono text-[11px] uppercase tracking-[0.4em] text-mono-dim">TEMPO</span>
-        <h1 className="mt-6 max-w-4xl text-balance font-display text-5xl font-bold leading-[1.05] tracking-tight text-mono sm:text-6xl md:text-7xl">
+        <span className="font-display text-7xl font-bold uppercase tracking-[0.18em] text-mono sm:text-8xl md:text-9xl">TEMPO</span>
+        <h1 className="mt-8 max-w-2xl text-balance font-display text-xl font-semibold leading-snug tracking-tight text-mono sm:text-2xl">
           The whole sky leans towards your cursor.
         </h1>
         <p className="mt-6 max-w-xl text-balance text-sm leading-relaxed text-mono-dim sm:text-base">
