@@ -31,7 +31,7 @@ export function GravityStars({ className }: { className?: string }) {
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const count = Math.min(2250, Math.max(800, Math.round((width * height) / 760)));
+      const count = Math.min(790, Math.max(280, Math.round((width * height) / 2170)));
       stars = Array.from({ length: count }, () => {
         const x = Math.random() * width;
         const y = Math.random() * height;
