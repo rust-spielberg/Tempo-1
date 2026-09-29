@@ -10,7 +10,7 @@ export type Asset = {
   id: string;
   symbol: string;
   name: string;
-  category: "Crypto" | "Tech Stocks" | "Index";
+  category: "Crypto" | "Forex" | "Tech Stocks" | "Index";
   price: number;
   change: number;
   volume: number;
@@ -147,11 +147,55 @@ export const ASSETS: Asset[] = [
       { source: "@breadthbot", text: "Only 38% of members above their 50-day average.", tag: "Bearish" },
     ],
   },
+  {
+    id: "xrp", symbol: "XRP", name: "XRP", category: "Crypto",
+    price: 2.41, change: 4.12, volume: 6_800_000_000, vibe: 66, liquidations: 31, volatility: 52, socialVelocity: 74,
+    explanation:
+      "Buyers keep stepping in on every regulatory headline instead of fleeing it, so the mood has shifted from anxiety to patient positioning. Volume is rising without euphoric chatter, which reads as quiet accumulation.",
+    evidence: [
+      { source: "Bloomberg", text: "Cross-border settlement pilots expand to two new banks.", tag: "Bullish" },
+      { source: "@ledgerlens", text: "Whale wallets added 180M XRP this week.", tag: "Bullish" },
+      { source: "r/crypto", text: "Another lawsuit appeal is coming, mark my words.", tag: "FUD" },
+    ],
+  },
+  {
+    id: "eurusd", symbol: "EUR/USD", name: "Euro / US Dollar", category: "Forex",
+    price: 1.0862, change: -0.34, volume: 610_000_000_000, vibe: 41, liquidations: 18, volatility: 22, socialVelocity: 33,
+    explanation:
+      "Rate-cut expectations in Europe are drifting ahead of the Fed, and traders are slowly leaning against the euro. It is not panic, but the tone has turned cautious and defensive.",
+    evidence: [
+      { source: "ECB minutes", text: "Several members open to a June cut.", tag: "Bearish" },
+      { source: "FT", text: "US services data surprises to the upside.", tag: "Bearish" },
+      { source: "Desk note", text: "Real-money buyers defend 1.08 handle.", tag: "Bullish" },
+    ],
+  },
+  {
+    id: "usdjpy", symbol: "USD/JPY", name: "US Dollar / Yen", category: "Forex",
+    price: 157.84, change: 1.12, volume: 320_000_000_000, vibe: 27, liquidations: 58, volatility: 64, socialVelocity: 69,
+    explanation:
+      "The pair is pressing into levels where intervention has happened before, and everyone is watching for the Ministry of Finance to strike. Positioning is crowded and nervous, the recipe for a sudden violent reversal.",
+    evidence: [
+      { source: "Nikkei", text: "Finance ministry warns of 'excessive moves'.", tag: "Bearish" },
+      { source: "@fxflows", text: "Carry trade longs at a 17-year extreme.", tag: "FUD" },
+      { source: "Reuters", text: "US yields hold near cycle highs.", tag: "Bullish" },
+    ],
+  },
+  {
+    id: "gbpusd", symbol: "GBP/USD", name: "Pound / US Dollar", category: "Forex",
+    price: 1.2714, change: 0.41, volume: 290_000_000_000, vibe: 58, liquidations: 14, volatility: 28, socialVelocity: 29,
+    explanation:
+      "Sticky UK inflation keeps the Bank of England on hold longer than peers, giving sterling a steady bid. The mood is calm and mildly constructive rather than excited.",
+    evidence: [
+      { source: "ONS", text: "Services inflation holds above 6%.", tag: "Bullish" },
+      { source: "Desk note", text: "Option vols sit near yearly lows.", tag: "Bullish" },
+      { source: "@gilttrader", text: "Growth data still looks recessionary.", tag: "Bearish" },
+    ],
+  },
 ];
 
 export function vibeLabel(vibe: number): { label: string; tone: "ice" | "panic" } {
-  if (vibe >= 75) return { label: "Silent Euphoria", tone: "ice" };
-  if (vibe >= 60) return { label: "Silent Accumulation", tone: "ice" };
+  if (vibe >= 75) return { label: "Silent Accumulation", tone: "ice" };
+  if (vibe >= 60) return { label: "Steady Conviction", tone: "ice" };
   if (vibe >= 45) return { label: "Calm Drift", tone: "ice" };
   if (vibe >= 30) return { label: "Rising Fear", tone: "panic" };
   return { label: "Severe Panic", tone: "panic" };
