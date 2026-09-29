@@ -31,7 +31,7 @@ export function GravityStars({ className }: { className?: string }) {
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const count = Math.min(520, Math.max(200, Math.round((width * height) / 3200)));
+      const count = Math.min(900, Math.max(320, Math.round((width * height) / 1900)));
       stars = Array.from({ length: count }, () => {
         const x = Math.random() * width;
         const y = Math.random() * height;
@@ -68,7 +68,7 @@ export function GravityStars({ className }: { className?: string }) {
           const b = stars[j]!;
           const d = Math.hypot(a.x - b.x, a.y - b.y);
           if (d > LINK) continue;
-          ctx.strokeStyle = `rgba(255,255,255,${(1 - d / LINK) * 0.28})`;
+          ctx.strokeStyle = `rgba(255,255,255,${(1 - d / LINK) * 0.4})`;
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
@@ -79,9 +79,9 @@ export function GravityStars({ className }: { className?: string }) {
 
       for (const s of stars) {
         const speed = Math.min(1, Math.hypot(s.vx, s.vy) / 3);
-        ctx.fillStyle = `rgba(255,255,255,${0.5 + speed * 0.5})`;
+        ctx.fillStyle = `rgba(255,255,255,${0.7 + speed * 0.3})`;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, 1.1 + speed * 1.4, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, 1.2 + speed * 1.6, 0, Math.PI * 2);
         ctx.fill();
       }
       frame = requestAnimationFrame(draw);
