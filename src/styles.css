@@ -161,6 +161,14 @@
   letter-spacing: 0.35em;
 }
 
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @keyframes tempo-pulse {
   0%,
   100% {

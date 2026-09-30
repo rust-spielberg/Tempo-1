@@ -1,21 +1,39 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
   Brain,
+  Check,
   Flame,
   Gauge,
+  Plus,
   Radar,
   Radio,
-  Search,
+  Sparkles,
   Waves,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BentoCard, BentoGrid } from "@/components/ui/bento-grid";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel";
+import { MultiSelectCombobox } from "@/components/ui/multi-select-combobox";
 import { ChangeFlow, PriceFlow, VolumeFlow } from "@/components/ui/number-flow-trading";
 import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
-import { ASSETS, vibeLabel, type Asset, type EvidenceTag } from "@/lib/tempo-data";
+import {
+  ASSETS,
+  DEFAULT_WATCHLIST_IDS,
+  vibeLabel,
+  type Asset,
+  type EvidenceTag,
+} from "@/lib/tempo-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/playground")({
@@ -46,6 +64,15 @@ const TAG_STYLES: Record<EvidenceTag, string> = {
   FUD: "border-border bg-secondary text-muted-foreground",
 };
 
+const TRENDING_ASSETS = [
+  "crypto-btc",
+  "crypto-eth",
+  "crypto-sol",
+  "crypto-doge",
+  "forex-eur-usd",
+  "forex-gbp-usd",
+].flatMap((id) => ASSETS.find((item) => item.id === id) ?? []);
+
 function useLiveAsset(base: Asset) {
   const [live, setLive] = useState(base);
   const baseRef = useRef(base);
@@ -64,7 +91,9 @@ function useLiveAsset(base: Asset) {
         return {
           ...prev,
           price,
-          change: Number((((price - anchor.price) / anchor.price) * 100 + anchor.change).toFixed(2)),
+          change: Number(
+            (((price - anchor.price) / anchor.price) * 100 + anchor.change).toFixed(2),
+          ),
           volume: Math.max(1, anchor.volume * (0.94 + Math.random() * 0.12)),
           vibe: Math.max(
             2,
@@ -85,31 +114,94 @@ function useLiveAsset(base: Asset) {
 }
 
 function PlaygroundPage() {
-  const [selectedId, setSelectedId] = useState(ASSETS[0]!.id);
-  const [query, setQuery] = useState("");
+  const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST_IDS);
+  const [selectedId, setSelectedId] = useState(DEFAULT_WATCHLIST_IDS[0]!);
+  const [watchlistLoaded, setWatchlistLoaded] = useState(false);
+  const [galleryApi, setGalleryApi] = useState<CarouselApi>();
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [autoplayPaused, setAutoplayPaused] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("tempo-watchlist");
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const validIds = parsed.filter(
+            (id): id is string => typeof id === "string" && ASSETS.some((item) => item.id === id),
+          );
+          setWatchlist(validIds);
+          if (validIds[0]) setSelectedId(validIds[0]);
+        }
+      }
+    } catch {
+      window.localStorage.removeItem("tempo-watchlist");
+    }
+    setWatchlistLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (watchlistLoaded) {
+      window.localStorage.setItem("tempo-watchlist", JSON.stringify(watchlist));
+    }
+  }, [watchlist, watchlistLoaded]);
+
+  useEffect(() => {
+    if (!galleryApi) return;
+
+    const syncSelection = () => {
+      const index = galleryApi.selectedScrollSnap();
+      setGalleryIndex(index);
+      const currentAsset = TRENDING_ASSETS[index];
+      if (currentAsset) setSelectedId(currentAsset.id);
+    };
+
+    syncSelection();
+    galleryApi.on("select", syncSelection);
+    galleryApi.on("reInit", syncSelection);
+    return () => {
+      galleryApi.off("select", syncSelection);
+      galleryApi.off("reInit", syncSelection);
+    };
+  }, [galleryApi]);
+
+  useEffect(() => {
+    if (!galleryApi || autoplayPaused) return;
+
+    const interval = window.setInterval(() => galleryApi.scrollNext(), 5000);
+    return () => window.clearInterval(interval);
+  }, [galleryApi, autoplayPaused]);
 
   const selectedBase = useMemo(
-    () => ASSETS.find((a) => a.id === selectedId) ?? ASSETS[0]!,
-    [selectedId],
+    () =>
+      ASSETS.find((a) => a.id === selectedId) ??
+      ASSETS.find((a) => watchlist.includes(a.id)) ??
+      ASSETS[0]!,
+    [selectedId, watchlist],
   );
   const asset = useLiveAsset(selectedBase);
   const vibe = vibeLabel(asset.vibe);
   const isPanic = vibe.tone === "panic";
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return ASSETS;
-    return ASSETS.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.symbol.toLowerCase().includes(q) ||
-        a.category.toLowerCase().includes(q),
+  const toggleWatchlist = (id: string) => {
+    setWatchlist((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     );
-  }, [query]);
+  };
 
   return (
     <main className="relative min-h-screen">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8"><Link to="/" className="font-display text-sm font-bold tracking-widest-xl text-gradient-ice">TEMPO</Link><span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{ASSETS.length} assets streaming</span></nav>
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8">
+        <Link
+          to="/"
+          className="font-display text-sm font-bold tracking-widest-xl text-gradient-ice"
+        >
+          TEMPO
+        </Link>
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          {ASSETS.length} instruments · simulated live
+        </span>
+      </nav>
       {/* ---------------- PLAYGROUND ---------------- */}
       <section id="terminal" className="relative mx-auto w-full max-w-6xl px-5 py-12 sm:px-8">
         <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -123,49 +215,219 @@ function PlaygroundPage() {
             </h2>
           </div>
 
-          <label className="panel flex w-full items-center gap-2 px-3 py-2 md:w-72">
-            <Search className="size-4 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search BTC, EUR/USD, NVDA…"
-              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            />
-          </label>
+          <MultiSelectCombobox assets={ASSETS} value={watchlist} onChange={setWatchlist} />
         </header>
 
-        {/* Asset selector */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {results.map((a) => {
-            const active = a.id === selectedId;
-            const tone = vibeLabel(a.vibe).tone;
-            return (
+        <section aria-labelledby="market-pulse-heading" className="mb-12">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <Sparkles className="size-3.5 text-ice" />
+                Cross-market radar
+              </span>
+              <h2 id="market-pulse-heading" className="mt-1 font-display text-xl font-semibold">
+                Trending instruments
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
+                Drag or select a market
+              </span>
               <button
-                key={a.id}
                 type="button"
-                onClick={() => setSelectedId(a.id)}
-                className={cn(
-                  "group flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm transition-all duration-300",
-                  active
-                    ? tone === "ice"
-                      ? "border-ice/45 bg-ice/10 text-ice"
-                      : "border-panic/45 bg-panic/10 text-panic"
-                    : "border-border bg-surface text-muted-foreground hover:border-ice/30 hover:text-foreground",
-                )}
+                aria-label="Previous trending instrument"
+                onClick={() => galleryApi?.scrollPrev()}
+                className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors hover:border-ice/40 hover:text-ice"
               >
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    tone === "ice" ? "bg-ice" : "bg-panic",
-                  )}
-                />
-                <span className="font-mono font-semibold">{a.symbol}</span>
-                <span className="hidden text-xs opacity-70 sm:inline">{a.name}</span>
+                <ArrowLeft className="size-4" />
               </button>
-            );
-          })}
-          {results.length === 0 && (
-            <p className="text-sm text-muted-foreground">No asset matches that search.</p>
+              <button
+                type="button"
+                aria-label="Next trending instrument"
+                onClick={() => galleryApi?.scrollNext()}
+                className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors hover:border-ice/40 hover:text-ice"
+              >
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+          </div>
+          <Carousel
+            setApi={setGalleryApi}
+            opts={{ align: "center", containScroll: false, loop: true, duration: 36 }}
+            className="relative -mx-5 cursor-grab touch-pan-y before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:z-20 before:w-8 before:bg-gradient-to-r before:from-background before:to-transparent after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:z-20 after:w-8 after:bg-gradient-to-l after:from-background after:to-transparent active:cursor-grabbing sm:-mx-8 sm:before:w-14 sm:after:w-14"
+            onMouseEnter={() => setAutoplayPaused(true)}
+            onMouseLeave={() => setAutoplayPaused(false)}
+            onPointerDown={(event) => {
+              if (event.pointerType === "touch") setAutoplayPaused(true);
+            }}
+            onPointerUp={(event) => {
+              if (event.pointerType === "touch") setAutoplayPaused(false);
+            }}
+          >
+            <CarouselContent className="items-center py-7 sm:py-9">
+              {TRENDING_ASSETS.map((item, index) => {
+                const selected = item.id === selectedId;
+                const centered = index === galleryIndex;
+                const tracked = watchlist.includes(item.id);
+                const displayPrice = selected ? asset.price : item.price;
+                const displayChange = selected ? asset.change : item.change;
+                const positive = displayChange >= 0;
+                const points = item.sparkline;
+                const min = Math.min(...points);
+                const max = Math.max(...points);
+                const line = points
+                  .map(
+                    (point, index) =>
+                      `${(index / (points.length - 1)) * 100},${30 - ((point - min) / (max - min || 1)) * 26}`,
+                  )
+                  .join(" ");
+                return (
+                  <CarouselItem
+                    key={item.id}
+                    className="basis-[82%] pl-3 sm:basis-[48%] sm:pl-4 lg:basis-[36%]"
+                  >
+                    <article
+                      className={cn(
+                        "group relative flex min-h-[340px] flex-col justify-between overflow-hidden rounded-lg border bg-obsidian p-5 transition-[transform,opacity,filter,border-color] duration-500 ease-out sm:min-h-[380px] sm:p-6",
+                        centered
+                          ? "z-10 scale-100 border-ice/45 opacity-100 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.9)]"
+                          : "scale-[0.88] border-border opacity-65 grayscale-[0.25]",
+                        selected && "ring-1 ring-ice/20",
+                      )}
+                    >
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,color-mix(in_oklab,var(--ice)_14%,transparent),transparent_58%),linear-gradient(155deg,color-mix(in_oklab,var(--surface-raised)_72%,transparent),transparent_68%)]" />
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none absolute -right-4 top-5 select-none font-display text-[6rem] font-bold leading-none opacity-[0.32] sm:text-[7rem]",
+                          positive ? "text-ice" : "text-panic",
+                        )}
+                      >
+                        {item.symbol.replaceAll("/", "")}
+                      </span>
+                      <div className="relative flex items-start justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(item.id);
+                            galleryApi?.scrollTo(index);
+                          }}
+                          className="min-w-0 text-left"
+                        >
+                          <span className="mb-3 inline-flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                            <span
+                              className={cn(
+                                "size-1.5 rounded-full",
+                                positive ? "bg-ice" : "bg-panic",
+                              )}
+                            />
+                            {item.category === "crypto" ? "Crypto market" : "Forex market"}
+                          </span>
+                          <span className="block font-display text-xl font-semibold tracking-wide sm:text-2xl">
+                            {item.symbol}
+                          </span>
+                          <span className="mt-1 block truncate text-xs text-muted-foreground">
+                            {item.name}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`${tracked ? "Remove" : "Add"} ${item.symbol} ${tracked ? "from" : "to"} watchlist`}
+                          onClick={() => toggleWatchlist(item.id)}
+                          className={cn(
+                            "relative z-10 inline-flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors",
+                            tracked
+                              ? "border-ice/40 bg-ice/10 text-ice"
+                              : "border-foreground/20 bg-foreground text-obsidian hover:bg-ice",
+                          )}
+                        >
+                          {tracked ? <Check className="size-4" /> : <Plus className="size-4" />}
+                        </button>
+                      </div>
+
+                      <div className="relative mt-auto pt-10">
+                        <div className="flex items-end justify-between gap-3">
+                          <div>
+                            <span className="block font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                              Live price
+                            </span>
+                            <span className="mt-1 block font-mono text-2xl font-medium tabular-nums sm:text-3xl">
+                              {displayPrice < 1
+                                ? displayPrice.toPrecision(4)
+                                : displayPrice.toLocaleString("en-US", {
+                                    maximumFractionDigits: 2,
+                                  })}
+                            </span>
+                          </div>
+                          <span
+                            className={cn(
+                              "mb-1 rounded-sm border px-2 py-1 font-mono text-[11px] tabular-nums",
+                              positive
+                                ? "border-ice/25 bg-ice/10 text-ice"
+                                : "border-panic/30 bg-panic/10 text-panic",
+                            )}
+                          >
+                            {positive ? "+" : ""}
+                            {displayChange.toFixed(2)}%
+                          </span>
+                        </div>
+                        <svg
+                          viewBox="0 0 100 32"
+                          preserveAspectRatio="none"
+                          aria-hidden="true"
+                          className="mt-5 h-12 w-full overflow-visible"
+                        >
+                          <polyline
+                            points={line}
+                            fill="none"
+                            stroke={positive ? "var(--ice)" : "var(--panic)"}
+                            strokeWidth="1.8"
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        </svg>
+                      </div>
+                      <div className="relative mt-4 flex items-center justify-between border-t border-border/70 pt-3 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+                        <span>
+                          Vibe {item.vibe} · {positive ? "Accumulation" : "Volatility"}
+                        </span>
+                        <ArrowUpRight className="size-3 opacity-70" />
+                      </div>
+                    </article>
+                  </CarouselItem>
+                );
+              })}
+            </CarouselContent>
+          </Carousel>
+        </section>
+
+        <div className="mb-6 flex min-h-9 flex-wrap items-center gap-2">
+          <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Watchlist
+          </span>
+          {watchlist.length ? (
+            watchlist.map((id) => {
+              const item = ASSETS.find((candidate) => candidate.id === id);
+              if (!item) return null;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSelectedId(id)}
+                  className={cn(
+                    "rounded-sm border px-2.5 py-1.5 font-mono text-[11px] transition-colors",
+                    selectedId === id
+                      ? "border-ice/45 bg-ice/10 text-ice"
+                      : "border-border bg-surface text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {item.symbol}
+                </button>
+              );
+            })
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              Add instruments to start tracking.
+            </span>
           )}
         </div>
 
@@ -241,10 +503,7 @@ function PlaygroundPage() {
               Live ticker
             </span>
             <div className="mt-4 flex flex-col gap-3">
-              <PriceFlow
-                value={asset.price}
-                className={isPanic ? "text-panic" : "text-ice"}
-              />
+              <PriceFlow value={asset.price} className={isPanic ? "text-panic" : "text-ice"} />
               <ChangeFlow value={asset.change} className="self-start" />
               <div className="mt-2 border-t border-border pt-3">
                 <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">

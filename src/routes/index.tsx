@@ -15,7 +15,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "TEMPO — Live Market Sentiment Radar" },
       {
         property: "og:description",
-        content: "Vibe Scores, live price telemetry and human explanations for why the market feels the way it does.",
+        content:
+          "Vibe Scores, live price telemetry and human explanations for why the market feels the way it does.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -32,11 +33,8 @@ function HomePage() {
 
       <div className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none relative z-10 flex flex-col items-center px-6 text-center duration-700">
         <span className="font-display text-7xl font-bold uppercase tracking-[0.18em] sm:text-8xl md:text-9xl">
-          <span className="bg-gradient-to-br from-ice-deep via-ice/50 to-ice/20 bg-clip-text text-transparent">T</span>
-          <span className="bg-gradient-to-br from-ice/95 via-ice/65 to-mono/85 bg-clip-text text-transparent">E</span>
-          <span className="text-mono">M</span>
-          <span className="bg-gradient-to-br from-mono/85 via-panic/65 to-panic/85 bg-clip-text text-transparent">P</span>
-          <span className="bg-gradient-to-br from-panic/40 via-panic/70 to-panic-deep bg-clip-text text-transparent">O</span>
+          <span className="text-[#7DF9FF]">TEM</span>
+          <span className="text-[#DC143C]">PO</span>
         </span>
         <p className="mt-6 max-w-xl text-balance text-sm leading-relaxed text-mono-dim sm:text-base">
           Translating market chaos and live sentiment telemetry into human emotional metrics.
