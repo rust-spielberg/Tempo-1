@@ -1,16 +1,18 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { ThinkingOrbs } from "../components/ui/thinking-orbs";
 
 function NotFoundComponent() {
   return (
@@ -130,8 +132,44 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <RootContent />
+    </QueryClientProvider>
+  );
+}
+
+function RootContent() {
+  const routeLoading = useRouterState({ select: (state) => state.isLoading });
+  const coreDataLoading = useIsFetching({ predicate: (query) => query.state.data === undefined });
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [overlayMounted, setOverlayMounted] = useState(true);
+  const isLoading = initialLoading || routeLoading || coreDataLoading > 0;
+
+  useEffect(() => {
+    setInitialLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) {
+      setOverlayMounted(true);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setOverlayMounted(false), 220);
+    return () => window.clearTimeout(timeout);
+  }, [isLoading]);
+
+  return (
+    <>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
-    </QueryClientProvider>
+      {overlayMounted && (
+        <div
+          className={`tempo-loading-overlay${isLoading ? " is-visible" : ""}`}
+          aria-hidden={!isLoading}
+        >
+          <ThinkingOrbs paused={!isLoading} />
+        </div>
+      )}
+    </>
   );
 }
