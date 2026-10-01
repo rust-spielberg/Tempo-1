@@ -23,6 +23,67 @@ export type Asset = {
   socialVelocity: number;
   explanation: string;
   evidence: Evidence[];
+  volumeAvailable?: boolean;
+  provider?: "coingecko" | "frankfurter";
+  providerId?: string;
+  baseCurrency?: string;
+  quoteCurrency?: string;
+};
+
+export function assetQuoteCurrency(
+  asset: Pick<Asset, "category" | "symbol" | "quoteCurrency">,
+): string {
+  if (asset.category === "crypto") return "USD";
+  return asset.quoteCurrency ?? asset.symbol.split("/")[1]?.trim().toUpperCase() ?? "USD";
+}
+
+export function assetPriceFractionDigits(asset: Pick<Asset, "category" | "price" | "symbol" | "quoteCurrency">) {
+  return displayPriceFractionDigits(asset, assetQuoteCurrency(asset), asset.price);
+}
+
+export function displayPriceFractionDigits(
+  asset: Pick<Asset, "category" | "price" | "symbol" | "quoteCurrency">,
+  currency: string,
+  price: number,
+) {
+  if (currency === "JPY") return 2;
+  if (asset.category === "forex") return 4;
+  return price < 1 ? 12 : 2;
+}
+
+export function formatAssetPrice(
+  asset: Pick<Asset, "category" | "price" | "symbol" | "quoteCurrency">,
+): string {
+  const currency = assetQuoteCurrency(asset);
+  const minimumFractionDigits = asset.category === "forex" ? 2 : undefined;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: assetPriceFractionDigits(asset),
+      ...(minimumFractionDigits === undefined ? {} : { minimumFractionDigits }),
+    }).format(asset.price);
+  } catch {
+    return `${currency} ${asset.price.toLocaleString("en-US", {
+      maximumFractionDigits: assetPriceFractionDigits(asset),
+    })}`;
+  }
+}
+
+export type AssetSearchResult = {
+  id: string;
+  symbol: string;
+  name: string;
+  category: AssetCategory;
+  provider: "fixture" | "coingecko" | "frankfurter";
+  providerId?: string;
+  baseCurrency?: string;
+  quoteCurrency?: string;
+};
+
+export type AssetSearchResponse = {
+  results: AssetSearchResult[];
+  remoteUnavailable: boolean;
 };
 
 type AssetSeed = readonly [symbol: string, name: string, price: number, change: number];
@@ -129,6 +190,313 @@ function createAsset(seed: AssetSeed, category: AssetCategory, index: number): A
 export const CRYPTO_ASSETS = CRYPTO_SEEDS.map((seed, index) => createAsset(seed, "crypto", index));
 export const FOREX_ASSETS = FOREX_SEEDS.map((seed, index) => createAsset(seed, "forex", index));
 export const ASSETS: Asset[] = [...CRYPTO_ASSETS, ...FOREX_ASSETS];
+
+let currencyRegistryRequest: Promise<Record<string, string>> | null = null;
+
+async function getCurrencyRegistry() {
+  currencyRegistryRequest ??= fetch("https://api.frankfurter.dev/v1/currencies")
+    .then(async (response) => {
+      if (!response.ok) throw new Error("Currency registry unavailable");
+      const payload: unknown = await response.json();
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        throw new Error("Invalid currency registry response");
+      }
+      return Object.fromEntries(
+        Object.entries(payload).filter(
+          (entry): entry is [string, string] =>
+            /^[A-Z]{3}$/.test(entry[0]) && typeof entry[1] === "string",
+        ),
+      );
+    })
+    .catch((error: unknown) => {
+      currencyRegistryRequest = null;
+      throw error;
+    });
+
+  return currencyRegistryRequest;
+}
+
+export async function getSupportedCurrencies() {
+  return getCurrencyRegistry();
+}
+
+export async function fetchExchangeRate(
+  baseCurrency: string,
+  quoteCurrency: string,
+  signal?: AbortSignal,
+): Promise<number> {
+  if (baseCurrency === quoteCurrency) return 1;
+  const url = new URL("https://api.frankfurter.dev/v1/latest");
+  url.search = new URLSearchParams({ base: baseCurrency, symbols: quoteCurrency }).toString();
+  const response = await fetch(url, signal ? { signal } : undefined);
+  if (!response.ok) throw new Error("Currency conversion unavailable");
+  const payload: unknown = await response.json();
+  const rates = payload && typeof payload === "object"
+    ? (payload as { rates?: unknown }).rates
+    : null;
+  const rate = rates && typeof rates === "object"
+    ? (rates as Record<string, unknown>)[quoteCurrency]
+    : null;
+  if (typeof rate !== "number" || !Number.isFinite(rate)) {
+    throw new Error("Currency conversion unavailable");
+  }
+  return rate;
+}
+
+export function searchLocalAssets(query: string, assets: Asset[]): AssetSearchResult[] {
+  const normalized = query.trim().toLowerCase();
+  return assets
+    .filter(
+      (asset) =>
+        !normalized ||
+        asset.symbol.toLowerCase().includes(normalized) ||
+        asset.name.toLowerCase().includes(normalized),
+    )
+    .map((asset) => ({
+      id: asset.id,
+      symbol: asset.symbol,
+      name: asset.name,
+      category: asset.category,
+      provider: asset.provider ?? "fixture",
+      ...(asset.providerId ? { providerId: asset.providerId } : {}),
+      ...(asset.baseCurrency ? { baseCurrency: asset.baseCurrency } : {}),
+      ...(asset.quoteCurrency ? { quoteCurrency: asset.quoteCurrency } : {}),
+    }));
+}
+
+async function searchCoinGecko(query: string, signal?: AbortSignal): Promise<AssetSearchResult[]> {
+  const response = await fetch(
+    `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`,
+    signal ? { signal } : undefined,
+  );
+  if (!response.ok) throw new Error("CoinGecko search unavailable");
+  const payload: unknown = await response.json();
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as { coins?: unknown }).coins)) {
+    throw new Error("Invalid CoinGecko search response");
+  }
+
+  return (payload as { coins: unknown[] }).coins.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const coin = entry as { id?: unknown; name?: unknown; symbol?: unknown };
+    if (
+      typeof coin.id !== "string" ||
+      typeof coin.name !== "string" ||
+      typeof coin.symbol !== "string"
+    ) {
+      return [];
+    }
+    return [{
+      id: `crypto-cg-${coin.id}`,
+      symbol: coin.symbol.toUpperCase(),
+      name: coin.name,
+      category: "crypto" as const,
+      provider: "coingecko" as const,
+      providerId: coin.id,
+    }];
+  }).slice(0, 10);
+}
+
+async function searchForexPairs(query: string): Promise<AssetSearchResult[]> {
+  const currencies = await getCurrencyRegistry();
+  const codes = Object.keys(currencies);
+  const normalized = query.trim().toLowerCase();
+  const compact = query.toUpperCase().replace(/[^A-Z]/g, "");
+  const explicitBase = compact.slice(0, 3);
+  const explicitQuote = compact.slice(3, 6);
+
+  if (compact.length === 6 && currencies[explicitBase] && currencies[explicitQuote]) {
+    return [createForexResult(explicitBase, explicitQuote, currencies)];
+  }
+
+  const matchingCodes = codes.filter(
+    (code) =>
+      code.toLowerCase().includes(normalized) ||
+      currencies[code]!.toLowerCase().includes(normalized),
+  );
+  const pairs = new Map<string, AssetSearchResult>();
+  for (const matched of matchingCodes.slice(0, 4)) {
+    for (const other of codes) {
+      if (other === matched) continue;
+      const forward = createForexResult(matched, other, currencies);
+      const reverse = createForexResult(other, matched, currencies);
+      pairs.set(forward.id, forward);
+      pairs.set(reverse.id, reverse);
+    }
+  }
+  return [...pairs.values()].slice(0, 40);
+}
+
+function createForexResult(
+  baseCurrency: string,
+  quoteCurrency: string,
+  currencies: Record<string, string>,
+): AssetSearchResult {
+  return {
+    id: `forex-live-${baseCurrency.toLowerCase()}-${quoteCurrency.toLowerCase()}`,
+    symbol: `${baseCurrency}/${quoteCurrency}`,
+    name: `${currencies[baseCurrency] ?? baseCurrency} / ${currencies[quoteCurrency] ?? quoteCurrency}`,
+    category: "forex",
+    provider: "frankfurter",
+    baseCurrency,
+    quoteCurrency,
+  };
+}
+
+export async function searchAssets(
+  query: string,
+  localAssets: Asset[] = ASSETS,
+  signal?: AbortSignal,
+): Promise<AssetSearchResponse> {
+  const localResults = searchLocalAssets(query, localAssets);
+  if (query.trim().length < 2) return { results: localResults, remoteUnavailable: false };
+
+  const requests = Promise.allSettled([
+    searchCoinGecko(query.trim(), signal),
+    searchForexPairs(query.trim()),
+  ]);
+  const [cryptoResponse, forexResponse] = await raceWithAbort(requests, signal);
+  if (signal?.aborted) throw new DOMException("Search cancelled", "AbortError");
+
+  const localNames = new Set(localResults.map((asset) => asset.name.toLowerCase()));
+  const remoteCrypto =
+    cryptoResponse.status === "fulfilled"
+      ? cryptoResponse.value.filter(
+          (asset) => !localNames.has(asset.name.toLowerCase()),
+        )
+      : [];
+  const remoteForex =
+    forexResponse.status === "fulfilled"
+      ? forexResponse.value.filter((asset) => !localNames.has(asset.name.toLowerCase()))
+      : [];
+
+  return {
+    results: [...localResults, ...remoteCrypto, ...remoteForex],
+    remoteUnavailable:
+      cryptoResponse.status === "rejected" || forexResponse.status === "rejected",
+  };
+}
+
+function raceWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new DOMException("Search cancelled", "AbortError"));
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+function createRemoteAsset(
+  result: AssetSearchResult,
+  price: number,
+  change: number,
+  volume?: number,
+): Asset {
+  const seed = hashText(result.id);
+  const vibe = Math.max(8, Math.min(92, Math.round(50 + change * 4)));
+  const positive = change >= 0;
+  const source = result.provider === "coingecko" ? "CoinGecko" : "Frankfurter";
+
+  return {
+    ...result,
+    provider: result.provider === "coingecko" ? "coingecko" : "frankfurter",
+    price,
+    change,
+    sparkline: createSparkline(price, change, seed),
+    volume: volume ?? 0,
+    volumeAvailable: volume !== undefined,
+    vibe,
+    liquidations: Math.max(4, Math.min(94, 28 + Math.abs(change) * 7 + (seed % 19))),
+    volatility: Math.max(8, Math.min(92, 24 + Math.abs(change) * 6 + (seed % 13))),
+    socialVelocity: Math.max(9, Math.min(96, 32 + Math.abs(change) * 8 + (seed % 23))),
+    explanation: `${result.name} price telemetry is fetched from ${source}. TEMPO sentiment metrics are simulated estimates.`,
+    evidence: [
+      {
+        source,
+        text: `Latest ${result.category === "crypto" ? "USD market price" : "exchange rate"} fetched from ${source}.`,
+        tag: positive ? "Bullish" : "Bearish",
+      },
+      {
+        source: "TEMPO pulse",
+        text: "Sentiment indicators are estimated locally for this instrument.",
+        tag: vibe >= 60 ? "Bullish" : "FUD",
+      },
+    ],
+  };
+}
+
+export async function resolveAssetSearchResult(
+  result: AssetSearchResult,
+  localAssets: Asset[] = ASSETS,
+): Promise<Asset> {
+  const existing = localAssets.find((asset) => asset.id === result.id);
+  if (result.provider === "fixture" && existing) return existing;
+
+  if (result.provider === "coingecko" && result.providerId) {
+    const url = new URL("https://api.coingecko.com/api/v3/simple/price");
+    url.search = new URLSearchParams({
+      ids: result.providerId,
+      vs_currencies: "usd",
+      include_24hr_change: "true",
+      include_24hr_vol: "true",
+    }).toString();
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Could not fetch the current crypto price");
+    const payload: unknown = await response.json();
+    const quote = payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)[result.providerId]
+      : null;
+    if (!quote || typeof quote !== "object") throw new Error("Price data was unavailable");
+    const values = quote as { usd?: unknown; usd_24h_change?: unknown; usd_24h_vol?: unknown };
+    if (typeof values.usd !== "number" || !Number.isFinite(values.usd)) {
+      throw new Error("Price data was unavailable");
+    }
+    const change = typeof values.usd_24h_change === "number" ? values.usd_24h_change : 0;
+    const volume =
+      typeof values.usd_24h_vol === "number" && Number.isFinite(values.usd_24h_vol)
+        ? values.usd_24h_vol
+        : undefined;
+    return createRemoteAsset(result, values.usd, Number.isFinite(change) ? change : 0, volume);
+  }
+
+  if (
+    result.provider === "frankfurter" &&
+    result.baseCurrency &&
+    result.quoteCurrency
+  ) {
+    const url = new URL(
+      `https://api.frankfurter.dev/v1/latest?base=${result.baseCurrency}&symbols=${result.quoteCurrency}`,
+    );
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Could not fetch the latest exchange rate");
+    const payload: unknown = await response.json();
+    const rates = payload && typeof payload === "object"
+      ? (payload as { rates?: unknown }).rates
+      : null;
+    const price = rates && typeof rates === "object"
+      ? (rates as Record<string, unknown>)[result.quoteCurrency]
+      : null;
+    if (typeof price !== "number" || !Number.isFinite(price)) {
+      throw new Error("Exchange rate data was unavailable");
+    }
+    return createRemoteAsset(result, price, 0);
+  }
+
+  if (existing) return existing;
+  throw new Error("This instrument could not be resolved");
+}
 
 export const DEFAULT_WATCHLIST_IDS = ["crypto-btc", "crypto-eth", "crypto-sol", "crypto-xrp", "forex-eur-usd", "forex-usd-jpy"];
 

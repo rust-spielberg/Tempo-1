@@ -31,7 +31,13 @@ import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import {
   ASSETS,
   DEFAULT_WATCHLIST_IDS,
+  assetPriceFractionDigits,
+  assetQuoteCurrency,
   changeSentiment,
+  displayPriceFractionDigits,
+  fetchExchangeRate,
+  formatAssetPrice,
+  getSupportedCurrencies,
   vibeLabel,
   type Asset,
   type EvidenceTag,
@@ -65,6 +71,18 @@ const TAG_STYLES: Record<EvidenceTag, string> = {
   Bullish: "border-bullish/35 bg-bullish/10 text-bullish",
   Bearish: "border-panic/40 bg-panic/10 text-panic",
   FUD: "border-panic/30 bg-panic/5 text-panic",
+};
+
+const FALLBACK_CURRENCIES: Record<string, string> = {
+  USD: "US Dollar",
+  EUR: "Euro",
+  INR: "Indian Rupee",
+  SGD: "Singapore Dollar",
+  GBP: "British Pound",
+  JPY: "Japanese Yen",
+  AUD: "Australian Dollar",
+  CAD: "Canadian Dollar",
+  CHF: "Swiss Franc",
 };
 
 const SENTIMENT_STYLES: Record<
@@ -106,23 +124,67 @@ const TRENDING_ASSETS = [
   "forex-gbp-usd",
 ].flatMap((id) => ASSETS.find((item) => item.id === id) ?? []);
 
+function isPersistedAsset(value: unknown): value is Asset {
+  if (!value || typeof value !== "object") return false;
+  const asset = value as Partial<Asset>;
+  return (
+    typeof asset.id === "string" &&
+    typeof asset.symbol === "string" &&
+    typeof asset.name === "string" &&
+    (asset.category === "crypto" || asset.category === "forex") &&
+    typeof asset.price === "number" &&
+    Number.isFinite(asset.price) &&
+    typeof asset.change === "number" &&
+    Number.isFinite(asset.change) &&
+    Array.isArray(asset.sparkline) &&
+    asset.sparkline.every((point) => typeof point === "number" && Number.isFinite(point)) &&
+    typeof asset.volume === "number" &&
+    (asset.volumeAvailable === undefined || typeof asset.volumeAvailable === "boolean") &&
+    typeof asset.vibe === "number" &&
+    typeof asset.liquidations === "number" &&
+    typeof asset.volatility === "number" &&
+    typeof asset.socialVelocity === "number" &&
+    typeof asset.explanation === "string" &&
+    Array.isArray(asset.evidence) &&
+    asset.evidence.every(
+      (item) =>
+        !!item &&
+        typeof item.source === "string" &&
+        typeof item.text === "string" &&
+        (item.tag === "Bullish" || item.tag === "Bearish" || item.tag === "FUD"),
+    ) &&
+    (asset.provider === "coingecko" || asset.provider === "frankfurter")
+  );
+}
+
 function readSavedWatchlist() {
   try {
     const stored = window.localStorage.getItem("tempo-watchlist");
     if (!stored) return null;
     const parsed: unknown = JSON.parse(stored);
     if (!Array.isArray(parsed)) return null;
-    return parsed.filter(
-      (id): id is string => typeof id === "string" && ASSETS.some((item) => item.id === id),
+    const savedCustomAssets: unknown = JSON.parse(
+      window.localStorage.getItem("tempo-watchlist-assets") ?? "[]",
     );
+    const customAssets = Array.isArray(savedCustomAssets)
+      ? savedCustomAssets.filter(isPersistedAsset)
+      : [];
+    const knownIds = new Set([...ASSETS, ...customAssets].map((asset) => asset.id));
+    return {
+      ids: [
+        ...new Set(parsed.filter((id): id is string => typeof id === "string" && knownIds.has(id))),
+      ],
+      customAssets,
+    };
   } catch {
     return null;
   }
 }
 
-function saveWatchlist(ids: string[]) {
+function saveWatchlist(ids: string[], customAssets: Asset[]) {
   try {
     window.localStorage.setItem("tempo-watchlist", JSON.stringify(ids));
+    window.localStorage.setItem("tempo-watchlist-assets", JSON.stringify(customAssets));
   } catch {
     return;
   }
@@ -149,7 +211,10 @@ function useLiveAsset(base: Asset) {
           change: Number(
             (((price - anchor.price) / anchor.price) * 100 + anchor.change).toFixed(2),
           ),
-          volume: Math.max(1, anchor.volume * (0.94 + Math.random() * 0.12)),
+          volume:
+            anchor.volumeAvailable === false
+              ? 0
+              : Math.max(1, anchor.volume * (0.94 + Math.random() * 0.12)),
           vibe: Math.max(
             2,
             Math.min(98, Number((prev.vibe + (Math.random() - 0.5) * 2.4).toFixed(1))),
@@ -169,13 +234,17 @@ function useLiveAsset(base: Asset) {
 }
 
 function AssetSelectionView({
+  assets,
   watchlist,
   onChange,
   onContinue,
+  onResolveAsset,
 }: {
+  assets: Asset[];
   watchlist: string[];
   onChange: (ids: string[]) => void;
   onContinue: () => void;
+  onResolveAsset: (asset: Asset) => void;
 }) {
   const [galleryApi, setGalleryApi] = useState<CarouselApi>();
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -197,7 +266,7 @@ function AssetSelectionView({
   useEffect(() => {
     if (!galleryApi || autoplayPaused) return;
 
-    const interval = window.setInterval(() => galleryApi.scrollNext(), 5000);
+    const interval = window.setInterval(() => galleryApi.scrollNext(), 3000);
     return () => window.clearInterval(interval);
   }, [galleryApi, autoplayPaused]);
 
@@ -222,7 +291,12 @@ function AssetSelectionView({
               watchlist.
             </p>
           </div>
-          <MultiSelectCombobox assets={ASSETS} value={watchlist} onChange={onChange} />
+          <MultiSelectCombobox
+            assets={assets}
+            value={watchlist}
+            onChange={onChange}
+            onResolveAsset={onResolveAsset}
+          />
         </header>
 
         <section aria-labelledby="market-pulse-heading">
@@ -355,9 +429,7 @@ function AssetSelectionView({
                               Market price
                             </span>
                             <span className="mt-1 block font-mono text-2xl font-medium tabular-nums sm:text-3xl">
-                              {item.price < 1
-                                ? item.price.toPrecision(4)
-                                : item.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                              {formatAssetPrice(item)}
                             </span>
                           </div>
                           <span
@@ -419,7 +491,7 @@ function AssetSelectionView({
             onClick={onContinue}
             className="inline-flex min-h-11 items-center gap-3 rounded-md bg-ice px-5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-obsidian transition-colors hover:bg-ice/85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Launch Terminal
+            Your Watchlist
             <ArrowRight className="size-4" />
           </button>
         </div>
@@ -430,20 +502,43 @@ function AssetSelectionView({
 
 function PlaygroundPage() {
   const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST_IDS);
+  const [customAssets, setCustomAssets] = useState<Asset[]>([]);
   const [terminalWatchlistIds, setTerminalWatchlistIds] = useState<string[] | null>(null);
   const [screen, setScreen] = useState<"selection" | "terminal">("selection");
   const [selectedId, setSelectedId] = useState(DEFAULT_WATCHLIST_IDS[0]!);
+  const [displayCurrency, setDisplayCurrency] = useState("USD");
+  const [currencyOptions, setCurrencyOptions] = useState(FALLBACK_CURRENCIES);
+  const [conversionRate, setConversionRate] = useState(1);
+  const [isConverting, setIsConverting] = useState(false);
+  const [conversionError, setConversionError] = useState(false);
 
   useEffect(() => {
     const savedIds = readSavedWatchlist();
     if (!savedIds) return;
-    setWatchlist(savedIds);
-    if (savedIds[0]) setSelectedId(savedIds[0]);
+    setCustomAssets(savedIds.customAssets);
+    setWatchlist(savedIds.ids);
+    if (savedIds.ids[0]) setSelectedId(savedIds.ids[0]);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    getSupportedCurrencies()
+      .then((supported) => {
+        if (active) setCurrencyOptions({ ...FALLBACK_CURRENCIES, ...supported });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const availableAssets = useMemo(() => [...ASSETS, ...customAssets], [customAssets]);
   const terminalWatchlist = useMemo(
-    () => (terminalWatchlistIds ?? []).flatMap((id) => ASSETS.filter((item) => item.id === id)),
-    [terminalWatchlistIds],
+    () =>
+      (terminalWatchlistIds ?? []).flatMap((id) =>
+        availableAssets.filter((item) => item.id === id),
+      ),
+    [availableAssets, terminalWatchlistIds],
   );
   const selectedBase = useMemo(
     () =>
@@ -452,10 +547,63 @@ function PlaygroundPage() {
       ASSETS[0]!,
     [selectedId, terminalWatchlist],
   );
+  const sourceCurrency = assetQuoteCurrency(selectedBase);
+
+  const currencyCodes = useMemo(() => {
+    const priority = ["USD", "EUR", "INR", "SGD", "GBP", "JPY"];
+    return Object.keys(currencyOptions).sort((left, right) => {
+      const leftRank = priority.indexOf(left);
+      const rightRank = priority.indexOf(right);
+      return (
+        (leftRank < 0 ? priority.length : leftRank) -
+          (rightRank < 0 ? priority.length : rightRank) || left.localeCompare(right)
+      );
+    });
+  }, [currencyOptions]);
+
+  useEffect(() => {
+    if (screen !== "terminal") return;
+
+    const controller = new AbortController();
+    setConversionRate(1);
+    setConversionError(false);
+    if (sourceCurrency === displayCurrency) {
+      setIsConverting(false);
+      return;
+    }
+
+    setIsConverting(true);
+    const timeout = window.setTimeout(() => {
+      setConversionError(true);
+      setIsConverting(false);
+      controller.abort();
+    }, 8000);
+
+    fetchExchangeRate(sourceCurrency, displayCurrency, controller.signal)
+      .then((rate) => {
+        if (!controller.signal.aborted) setConversionRate(rate);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setConversionError(true);
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (!controller.signal.aborted) setIsConverting(false);
+      });
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [displayCurrency, screen, sourceCurrency]);
+
   const asset = useLiveAsset(selectedBase);
   const vibe = vibeLabel(asset.vibe);
   const isPanic = vibe.tone === "panic";
   const vibeStyles = SENTIMENT_STYLES[vibe.tone];
+  const appliedCurrency = isConverting || conversionError ? sourceCurrency : displayCurrency;
+  const appliedRate = isConverting || conversionError ? 1 : conversionRate;
+  const displayedPrice = asset.price * appliedRate;
 
   const openTerminal = () => {
     if (watchlist.length === 0) return;
@@ -463,7 +611,10 @@ function PlaygroundPage() {
     const firstId = finalizedIds[0]!;
     setTerminalWatchlistIds(finalizedIds);
     setSelectedId((current) => (finalizedIds.includes(current) ? current : firstId));
-    saveWatchlist(finalizedIds);
+    saveWatchlist(
+      finalizedIds,
+      customAssets.filter((customAsset) => finalizedIds.includes(customAsset.id)),
+    );
     setScreen("terminal");
   };
 
@@ -482,9 +633,18 @@ function PlaygroundPage() {
           </span>
         </nav>
         <AssetSelectionView
+          assets={availableAssets}
           watchlist={watchlist}
           onChange={setWatchlist}
           onContinue={openTerminal}
+          onResolveAsset={(asset) => {
+            setSelectedId(asset.id);
+            if (!asset.provider) return;
+            setCustomAssets((current) => [
+              ...current.filter((item) => item.id !== asset.id),
+              asset,
+            ]);
+          }}
         />
       </main>
     );
@@ -529,29 +689,72 @@ function PlaygroundPage() {
           </button>
         </header>
 
-        <div className="mb-6 flex min-h-9 flex-wrap items-center gap-2">
-          <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Terminal assets
-          </span>
-          {terminalWatchlist.map((item) => {
-            const id = item.id;
-            const itemStyles = SENTIMENT_STYLES[vibeLabel(item.vibe).tone];
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setSelectedId(id)}
-                className={cn(
-                  "rounded-sm border px-2.5 py-1.5 font-mono text-[11px] transition-colors",
-                  selectedId === id
-                    ? cn(itemStyles.border, itemStyles.bg, itemStyles.text)
-                    : "border-border bg-surface text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {item.symbol}
-              </button>
-            );
-          })}
+        <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)]">
+          <section className="min-w-0">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Display currency
+            </span>
+            <div
+              role="group"
+              aria-label="Display currency"
+              className="scrollbar-none mt-2 flex gap-1.5 overflow-x-auto pb-1"
+            >
+              {currencyCodes.map((currency) => (
+                <button
+                  key={currency}
+                  type="button"
+                  title={`${currency} · ${currencyOptions[currency]}`}
+                  aria-label={`Display in ${currencyOptions[currency]} (${currency})`}
+                  aria-pressed={displayCurrency === currency}
+                  onClick={() => setDisplayCurrency(currency)}
+                  className={cn(
+                    "shrink-0 rounded-sm border px-2.5 py-1.5 font-mono text-[11px] transition-colors",
+                    displayCurrency === currency
+                      ? "border-ice/45 bg-ice/10 text-ice"
+                      : "border-border bg-surface text-muted-foreground hover:border-ice/30 hover:text-foreground",
+                  )}
+                >
+                  {currency}
+                </button>
+              ))}
+            </div>
+            {isConverting ? (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Updating {sourceCurrency}/{displayCurrency} rate...
+              </p>
+            ) : conversionError ? (
+              <p role="status" className="mt-1 text-[10px] text-panic">
+                Rate unavailable; showing {sourceCurrency}.
+              </p>
+            ) : null}
+          </section>
+
+          <section className="min-w-0">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Watchlist
+            </span>
+            <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto pb-1">
+              {terminalWatchlist.map((item) => {
+                const id = item.id;
+                const itemStyles = SENTIMENT_STYLES[vibeLabel(item.vibe).tone];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedId(id)}
+                    className={cn(
+                      "shrink-0 rounded-sm border px-2.5 py-1.5 font-mono text-[11px] transition-colors",
+                      selectedId === id
+                        ? cn(itemStyles.border, itemStyles.bg, itemStyles.text)
+                        : "border-border bg-surface text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {item.symbol}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         </div>
 
         <BentoGrid>
@@ -627,7 +830,13 @@ function PlaygroundPage() {
             </span>
             <div className="mt-4 flex flex-col gap-3">
               <PriceFlow
-                value={asset.price}
+                value={displayedPrice}
+                currency={appliedCurrency}
+                maximumFractionDigits={displayPriceFractionDigits(
+                  asset,
+                  appliedCurrency,
+                  displayedPrice,
+                )}
                 className={SENTIMENT_STYLES[changeSentiment(asset.change)].text}
               />
               <ChangeFlow value={asset.change} className="self-start" />
@@ -636,7 +845,11 @@ function PlaygroundPage() {
                   24h volume
                 </span>
                 <div className="mt-1 text-foreground">
-                  <VolumeFlow value={asset.volume} />
+                  {asset.volumeAvailable === false ? (
+                    <span className="font-mono text-sm text-muted-foreground">Unavailable</span>
+                  ) : (
+                    <VolumeFlow value={asset.volume * appliedRate} currency={appliedCurrency} />
+                  )}
                 </div>
               </div>
             </div>

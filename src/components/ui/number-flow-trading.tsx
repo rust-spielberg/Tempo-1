@@ -7,10 +7,12 @@ import { cn } from "@/lib/utils";
 export function PriceFlow({
   value,
   currency = "USD",
+  maximumFractionDigits = value < 10 ? 4 : 2,
   className,
 }: {
   value: number;
   currency?: string;
+  maximumFractionDigits?: number;
   className?: string;
 }) {
   return (
@@ -19,7 +21,7 @@ export function PriceFlow({
       format={{
         style: "currency",
         currency,
-        maximumFractionDigits: value < 10 ? 4 : 2,
+        maximumFractionDigits,
       }}
       className={cn("font-mono text-4xl font-semibold tabular-nums", className)}
     />
@@ -51,12 +53,11 @@ export function ChangeFlow({ value, className }: { value: number; className?: st
   );
 }
 
-export function VolumeFlow({ value }: { value: number }) {
+export function VolumeFlow({ value, currency = "USD" }: { value: number; currency?: string }) {
   return (
     <NumberFlow
       value={value}
-      format={{ notation: "compact", maximumFractionDigits: 2 }}
-      prefix="$"
+      format={{ style: "currency", currency, notation: "compact", maximumFractionDigits: 2 }}
       className="font-mono text-2xl font-semibold tabular-nums"
     />
   );
