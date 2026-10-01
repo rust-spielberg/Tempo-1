@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 
-import { GravityStars } from "@/components/ui/gravity-stars";
+import { ReactiveGlowGrid } from "@/components/ui/reactive-glow-grid";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,14 +27,14 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   return (
-    <main className="relative flex h-screen items-center justify-center overflow-hidden bg-obsidian">
-      <GravityStars />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_45%_at_50%_50%,transparent_0%,var(--obsidian)_100%)]" />
+    <main className="relative flex h-screen w-full items-center justify-center overflow-hidden bg-obsidian">
+      <ReactiveGlowGrid />
 
       <div className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none relative z-10 flex flex-col items-center px-6 text-center duration-700">
-        <span className="font-display text-7xl font-bold uppercase tracking-[0.18em] sm:text-8xl md:text-9xl">
-          <span className="text-[#7DF9FF]">TEM</span>
-          <span className="text-[#DC143C]">PO</span>
+        <span className="font-display text-7xl font-extrabold uppercase tracking-[0.2em] sm:text-8xl md:text-9xl">
+          <span className="bg-[linear-gradient(90deg,#22C55E_0%,#7DF9FF_32%,#fff_50%,#7DF9FF_68%,#EF4444_100%)] bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(125,249,255,0.3)]">
+            TEMPO
+          </span>
         </span>
         <p className="mt-6 max-w-xl text-balance text-sm leading-relaxed text-mono-dim sm:text-base">
           Translating market chaos and live sentiment telemetry into human emotional metrics.

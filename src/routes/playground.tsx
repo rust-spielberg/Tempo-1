@@ -11,6 +11,7 @@ import {
   Plus,
   Radar,
   Radio,
+  Settings2,
   Sparkles,
   Waves,
   Zap,
@@ -30,9 +31,11 @@ import { ProgressMetricCard } from "@/components/ui/progress-metric-card";
 import {
   ASSETS,
   DEFAULT_WATCHLIST_IDS,
+  changeSentiment,
   vibeLabel,
   type Asset,
   type EvidenceTag,
+  type SentimentTone,
 } from "@/lib/tempo-data";
 import { cn } from "@/lib/utils";
 
@@ -59,9 +62,39 @@ export const Route = createFileRoute("/playground")({
 });
 
 const TAG_STYLES: Record<EvidenceTag, string> = {
-  Bullish: "border-ice/35 bg-ice/10 text-ice",
+  Bullish: "border-bullish/35 bg-bullish/10 text-bullish",
   Bearish: "border-panic/40 bg-panic/10 text-panic",
-  FUD: "border-border bg-secondary text-muted-foreground",
+  FUD: "border-panic/30 bg-panic/5 text-panic",
+};
+
+const SENTIMENT_STYLES: Record<
+  SentimentTone,
+  { text: string; bg: string; border: string; fill: string; glow: string; ring: string }
+> = {
+  bullish: {
+    text: "text-bullish",
+    bg: "bg-bullish/10",
+    border: "border-bullish/45",
+    fill: "bg-bullish",
+    glow: "bg-bullish/35",
+    ring: "ring-bullish/20",
+  },
+  neutral: {
+    text: "text-ice",
+    bg: "bg-ice/10",
+    border: "border-ice/45",
+    fill: "bg-ice",
+    glow: "bg-ice/35",
+    ring: "ring-ice/20",
+  },
+  panic: {
+    text: "text-panic",
+    bg: "bg-panic/10",
+    border: "border-panic/45",
+    fill: "bg-panic",
+    glow: "bg-panic/40",
+    ring: "ring-panic/20",
+  },
 };
 
 const TRENDING_ASSETS = [
@@ -72,6 +105,28 @@ const TRENDING_ASSETS = [
   "forex-eur-usd",
   "forex-gbp-usd",
 ].flatMap((id) => ASSETS.find((item) => item.id === id) ?? []);
+
+function readSavedWatchlist() {
+  try {
+    const stored = window.localStorage.getItem("tempo-watchlist");
+    if (!stored) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (id): id is string => typeof id === "string" && ASSETS.some((item) => item.id === id),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function saveWatchlist(ids: string[]) {
+  try {
+    window.localStorage.setItem("tempo-watchlist", JSON.stringify(ids));
+  } catch {
+    return;
+  }
+}
 
 function useLiveAsset(base: Asset) {
   const [live, setLive] = useState(base);
@@ -113,55 +168,29 @@ function useLiveAsset(base: Asset) {
   return live;
 }
 
-function PlaygroundPage() {
-  const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST_IDS);
-  const [selectedId, setSelectedId] = useState(DEFAULT_WATCHLIST_IDS[0]!);
-  const [watchlistLoaded, setWatchlistLoaded] = useState(false);
+function AssetSelectionView({
+  watchlist,
+  onChange,
+  onContinue,
+}: {
+  watchlist: string[];
+  onChange: (ids: string[]) => void;
+  onContinue: () => void;
+}) {
   const [galleryApi, setGalleryApi] = useState<CarouselApi>();
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [autoplayPaused, setAutoplayPaused] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("tempo-watchlist");
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          const validIds = parsed.filter(
-            (id): id is string => typeof id === "string" && ASSETS.some((item) => item.id === id),
-          );
-          setWatchlist(validIds);
-          if (validIds[0]) setSelectedId(validIds[0]);
-        }
-      }
-    } catch {
-      window.localStorage.removeItem("tempo-watchlist");
-    }
-    setWatchlistLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (watchlistLoaded) {
-      window.localStorage.setItem("tempo-watchlist", JSON.stringify(watchlist));
-    }
-  }, [watchlist, watchlistLoaded]);
-
-  useEffect(() => {
     if (!galleryApi) return;
 
-    const syncSelection = () => {
-      const index = galleryApi.selectedScrollSnap();
-      setGalleryIndex(index);
-      const currentAsset = TRENDING_ASSETS[index];
-      if (currentAsset) setSelectedId(currentAsset.id);
-    };
-
-    syncSelection();
-    galleryApi.on("select", syncSelection);
-    galleryApi.on("reInit", syncSelection);
+    const syncIndex = () => setGalleryIndex(galleryApi.selectedScrollSnap());
+    syncIndex();
+    galleryApi.on("select", syncIndex);
+    galleryApi.on("reInit", syncIndex);
     return () => {
-      galleryApi.off("select", syncSelection);
-      galleryApi.off("reInit", syncSelection);
+      galleryApi.off("select", syncIndex);
+      galleryApi.off("reInit", syncIndex);
     };
   }, [galleryApi]);
 
@@ -172,53 +201,31 @@ function PlaygroundPage() {
     return () => window.clearInterval(interval);
   }, [galleryApi, autoplayPaused]);
 
-  const selectedBase = useMemo(
-    () =>
-      ASSETS.find((a) => a.id === selectedId) ??
-      ASSETS.find((a) => watchlist.includes(a.id)) ??
-      ASSETS[0]!,
-    [selectedId, watchlist],
-  );
-  const asset = useLiveAsset(selectedBase);
-  const vibe = vibeLabel(asset.vibe);
-  const isPanic = vibe.tone === "panic";
-
   const toggleWatchlist = (id: string) => {
-    setWatchlist((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
+    onChange(watchlist.includes(id) ? watchlist.filter((item) => item !== id) : [...watchlist, id]);
   };
 
   return (
-    <main className="relative min-h-screen">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8">
-        <Link
-          to="/"
-          className="font-display text-sm font-bold tracking-widest-xl text-gradient-ice"
-        >
-          TEMPO
-        </Link>
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          {ASSETS.length} instruments · simulated live
-        </span>
-      </nav>
-      {/* ---------------- PLAYGROUND ---------------- */}
-      <section id="terminal" className="relative mx-auto w-full max-w-6xl px-5 py-12 sm:px-8">
-        <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <>
+      <section className="relative mx-auto w-full max-w-6xl px-5 pb-36 pt-12 sm:px-8 sm:pt-16">
+        <header className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.28em] text-ice">
               <Radar className="size-3.5" />
-              Sentiment playground
+              Build your signal desk
             </span>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              The emotional state of the tape
-            </h2>
+            <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              Choose what moves your tape.
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              Browse the trending markets or search the full instrument list to build your
+              watchlist.
+            </p>
           </div>
-
-          <MultiSelectCombobox assets={ASSETS} value={watchlist} onChange={setWatchlist} />
+          <MultiSelectCombobox assets={ASSETS} value={watchlist} onChange={onChange} />
         </header>
 
-        <section aria-labelledby="market-pulse-heading" className="mb-12">
+        <section aria-labelledby="market-pulse-heading">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -251,6 +258,7 @@ function PlaygroundPage() {
               </button>
             </div>
           </div>
+
           <Carousel
             setApi={setGalleryApi}
             opts={{ align: "center", containScroll: false, loop: true, duration: 36 }}
@@ -266,21 +274,21 @@ function PlaygroundPage() {
           >
             <CarouselContent className="items-center py-7 sm:py-9">
               {TRENDING_ASSETS.map((item, index) => {
-                const selected = item.id === selectedId;
-                const centered = index === galleryIndex;
                 const tracked = watchlist.includes(item.id);
-                const displayPrice = selected ? asset.price : item.price;
-                const displayChange = selected ? asset.change : item.change;
-                const positive = displayChange >= 0;
-                const points = item.sparkline;
-                const min = Math.min(...points);
-                const max = Math.max(...points);
-                const line = points
+                const centered = index === galleryIndex;
+                const itemTone = vibeLabel(item.vibe).tone;
+                const itemStyles = SENTIMENT_STYLES[itemTone];
+                const itemChangeTone = changeSentiment(item.change);
+                const changeStyles = SENTIMENT_STYLES[itemChangeTone];
+                const min = Math.min(...item.sparkline);
+                const max = Math.max(...item.sparkline);
+                const line = item.sparkline
                   .map(
-                    (point, index) =>
-                      `${(index / (points.length - 1)) * 100},${30 - ((point - min) / (max - min || 1)) * 26}`,
+                    (point, pointIndex) =>
+                      `${(pointIndex / (item.sparkline.length - 1)) * 100},${30 - ((point - min) / (max - min || 1)) * 26}`,
                   )
                   .join(" ");
+
                 return (
                   <CarouselItem
                     key={item.id}
@@ -290,9 +298,12 @@ function PlaygroundPage() {
                       className={cn(
                         "group relative flex min-h-[340px] flex-col justify-between overflow-hidden rounded-lg border bg-obsidian p-5 transition-[transform,opacity,filter,border-color] duration-500 ease-out sm:min-h-[380px] sm:p-6",
                         centered
-                          ? "z-10 scale-100 border-ice/45 opacity-100 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.9)]"
+                          ? cn(
+                              "z-10 scale-100 opacity-100 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.9)]",
+                              itemStyles.border,
+                            )
                           : "scale-[0.88] border-border opacity-65 grayscale-[0.25]",
-                        selected && "ring-1 ring-ice/20",
+                        tracked && cn("ring-1", itemStyles.ring),
                       )}
                     >
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,color-mix(in_oklab,var(--ice)_14%,transparent),transparent_58%),linear-gradient(155deg,color-mix(in_oklab,var(--surface-raised)_72%,transparent),transparent_68%)]" />
@@ -300,7 +311,7 @@ function PlaygroundPage() {
                         aria-hidden="true"
                         className={cn(
                           "pointer-events-none absolute -right-4 top-5 select-none font-display text-[6rem] font-bold leading-none opacity-[0.32] sm:text-[7rem]",
-                          positive ? "text-ice" : "text-panic",
+                          itemStyles.text,
                         )}
                       >
                         {item.symbol.replaceAll("/", "")}
@@ -308,19 +319,11 @@ function PlaygroundPage() {
                       <div className="relative flex items-start justify-between gap-3">
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedId(item.id);
-                            galleryApi?.scrollTo(index);
-                          }}
+                          onClick={() => galleryApi?.scrollTo(index)}
                           className="min-w-0 text-left"
                         >
                           <span className="mb-3 inline-flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                            <span
-                              className={cn(
-                                "size-1.5 rounded-full",
-                                positive ? "bg-ice" : "bg-panic",
-                              )}
-                            />
+                            <span className={cn("size-1.5 rounded-full", changeStyles.fill)} />
                             {item.category === "crypto" ? "Crypto market" : "Forex market"}
                           </span>
                           <span className="block font-display text-xl font-semibold tracking-wide sm:text-2xl">
@@ -349,26 +352,24 @@ function PlaygroundPage() {
                         <div className="flex items-end justify-between gap-3">
                           <div>
                             <span className="block font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-                              Live price
+                              Market price
                             </span>
                             <span className="mt-1 block font-mono text-2xl font-medium tabular-nums sm:text-3xl">
-                              {displayPrice < 1
-                                ? displayPrice.toPrecision(4)
-                                : displayPrice.toLocaleString("en-US", {
-                                    maximumFractionDigits: 2,
-                                  })}
+                              {item.price < 1
+                                ? item.price.toPrecision(4)
+                                : item.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                             </span>
                           </div>
                           <span
                             className={cn(
                               "mb-1 rounded-sm border px-2 py-1 font-mono text-[11px] tabular-nums",
-                              positive
-                                ? "border-ice/25 bg-ice/10 text-ice"
-                                : "border-panic/30 bg-panic/10 text-panic",
+                              changeStyles.border,
+                              changeStyles.bg,
+                              changeStyles.text,
                             )}
                           >
-                            {positive ? "+" : ""}
-                            {displayChange.toFixed(2)}%
+                            {item.change > 0 ? "+" : ""}
+                            {item.change.toFixed(2)}%
                           </span>
                         </div>
                         <svg
@@ -380,15 +381,21 @@ function PlaygroundPage() {
                           <polyline
                             points={line}
                             fill="none"
-                            stroke={positive ? "var(--ice)" : "var(--panic)"}
+                            stroke={
+                              itemChangeTone === "bullish"
+                                ? "var(--bullish)"
+                                : itemChangeTone === "panic"
+                                  ? "var(--panic)"
+                                  : "var(--ice)"
+                            }
                             strokeWidth="1.8"
                             vectorEffect="non-scaling-stroke"
                           />
                         </svg>
                       </div>
                       <div className="relative mt-4 flex items-center justify-between border-t border-border/70 pt-3 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
-                        <span>
-                          Vibe {item.vibe} · {positive ? "Accumulation" : "Volatility"}
+                        <span className={itemStyles.text}>
+                          Vibe {item.vibe} · {vibeLabel(item.vibe).label}
                         </span>
                         <ArrowUpRight className="size-3 opacity-70" />
                       </div>
@@ -399,36 +406,152 @@ function PlaygroundPage() {
             </CarouselContent>
           </Carousel>
         </section>
+      </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="text-ice">{watchlist.length}</span> instruments selected
+          </p>
+          <button
+            type="button"
+            disabled={watchlist.length === 0}
+            onClick={onContinue}
+            className="inline-flex min-h-11 items-center gap-3 rounded-md bg-ice px-5 font-mono text-xs font-bold uppercase tracking-[0.14em] text-obsidian transition-colors hover:bg-ice/85 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Launch Terminal
+            <ArrowRight className="size-4" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PlaygroundPage() {
+  const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST_IDS);
+  const [terminalWatchlistIds, setTerminalWatchlistIds] = useState<string[] | null>(null);
+  const [screen, setScreen] = useState<"selection" | "terminal">("selection");
+  const [selectedId, setSelectedId] = useState(DEFAULT_WATCHLIST_IDS[0]!);
+
+  useEffect(() => {
+    const savedIds = readSavedWatchlist();
+    if (!savedIds) return;
+    setWatchlist(savedIds);
+    if (savedIds[0]) setSelectedId(savedIds[0]);
+  }, []);
+
+  const terminalWatchlist = useMemo(
+    () => (terminalWatchlistIds ?? []).flatMap((id) => ASSETS.filter((item) => item.id === id)),
+    [terminalWatchlistIds],
+  );
+  const selectedBase = useMemo(
+    () =>
+      terminalWatchlist.find((assetItem) => assetItem.id === selectedId) ??
+      terminalWatchlist[0] ??
+      ASSETS[0]!,
+    [selectedId, terminalWatchlist],
+  );
+  const asset = useLiveAsset(selectedBase);
+  const vibe = vibeLabel(asset.vibe);
+  const isPanic = vibe.tone === "panic";
+  const vibeStyles = SENTIMENT_STYLES[vibe.tone];
+
+  const openTerminal = () => {
+    if (watchlist.length === 0) return;
+    const finalizedIds = [...watchlist];
+    const firstId = finalizedIds[0]!;
+    setTerminalWatchlistIds(finalizedIds);
+    setSelectedId((current) => (finalizedIds.includes(current) ? current : firstId));
+    saveWatchlist(finalizedIds);
+    setScreen("terminal");
+  };
+
+  if (screen === "selection") {
+    return (
+      <main className="relative min-h-screen">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8">
+          <Link
+            to="/"
+            className="font-display text-sm font-bold tracking-widest-xl text-gradient-ice"
+          >
+            TEMPO
+          </Link>
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+            {ASSETS.length} instruments · simulated live
+          </span>
+        </nav>
+        <AssetSelectionView
+          watchlist={watchlist}
+          onChange={setWatchlist}
+          onContinue={openTerminal}
+        />
+      </main>
+    );
+  }
+
+  return (
+    <main className="relative min-h-screen">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8">
+        <Link
+          to="/"
+          className="font-display text-sm font-bold tracking-widest-xl text-gradient-ice"
+        >
+          TEMPO
+        </Link>
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          {ASSETS.length} instruments · simulated live
+        </span>
+      </nav>
+      {/* ---------------- PLAYGROUND ---------------- */}
+      <section id="terminal" className="relative mx-auto w-full max-w-6xl px-5 py-12 sm:px-8">
+        <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.28em] text-ice">
+              <Radar className="size-3.5" />
+              Sentiment playground
+            </span>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              The emotional state of the tape
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setWatchlist(terminalWatchlistIds ?? []);
+              setScreen("selection");
+            }}
+            className="inline-flex h-10 items-center gap-2 self-start rounded-md border border-border bg-surface px-3 text-xs uppercase tracking-[0.12em] text-foreground transition-colors hover:border-ice/40 hover:bg-surface-raised md:self-auto"
+          >
+            <Settings2 className="size-4" />
+            Customize watchlist
+          </button>
+        </header>
 
         <div className="mb-6 flex min-h-9 flex-wrap items-center gap-2">
           <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Watchlist
+            Terminal assets
           </span>
-          {watchlist.length ? (
-            watchlist.map((id) => {
-              const item = ASSETS.find((candidate) => candidate.id === id);
-              if (!item) return null;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setSelectedId(id)}
-                  className={cn(
-                    "rounded-sm border px-2.5 py-1.5 font-mono text-[11px] transition-colors",
-                    selectedId === id
-                      ? "border-ice/45 bg-ice/10 text-ice"
-                      : "border-border bg-surface text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {item.symbol}
-                </button>
-              );
-            })
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Add instruments to start tracking.
-            </span>
-          )}
+          {terminalWatchlist.map((item) => {
+            const id = item.id;
+            const itemStyles = SENTIMENT_STYLES[vibeLabel(item.vibe).tone];
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSelectedId(id)}
+                className={cn(
+                  "rounded-sm border px-2.5 py-1.5 font-mono text-[11px] transition-colors",
+                  selectedId === id
+                    ? cn(itemStyles.border, itemStyles.bg, itemStyles.text)
+                    : "border-border bg-surface text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {item.symbol}
+              </button>
+            );
+          })}
         </div>
 
         <BentoGrid>
@@ -443,7 +566,7 @@ function PlaygroundPage() {
                   <span
                     className={cn(
                       "font-mono text-6xl font-bold leading-none tabular-nums sm:text-7xl",
-                      isPanic ? "text-panic" : "text-ice",
+                      vibeStyles.text,
                     )}
                   >
                     {Math.round(asset.vibe)}
@@ -453,9 +576,9 @@ function PlaygroundPage() {
                 <span
                   className={cn(
                     "mt-4 inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]",
-                    isPanic
-                      ? "border-panic/40 bg-panic/10 text-panic"
-                      : "border-ice/40 bg-ice/10 text-ice",
+                    vibeStyles.border,
+                    vibeStyles.bg,
+                    vibeStyles.text,
                   )}
                 >
                   {isPanic ? <Flame className="size-3.5" /> : <Waves className="size-3.5" />}
@@ -468,16 +591,16 @@ function PlaygroundPage() {
                 <div
                   className={cn(
                     "animate-tempo-pulse absolute size-28 rounded-full blur-2xl",
-                    isPanic ? "bg-panic/40" : "bg-ice/35",
+                    vibeStyles.glow,
                   )}
                 />
                 <div
                   className={cn(
                     "relative flex size-20 items-center justify-center rounded-full border",
-                    isPanic ? "border-panic/50" : "border-ice/50",
+                    vibeStyles.border,
                   )}
                 >
-                  <Gauge className={cn("size-8", isPanic ? "text-panic" : "text-ice")} />
+                  <Gauge className={cn("size-8", vibeStyles.text)} />
                 </div>
               </div>
             </div>
@@ -486,7 +609,7 @@ function PlaygroundPage() {
               <div
                 className={cn(
                   "h-full rounded-full transition-[width] duration-700 ease-out",
-                  isPanic ? "bg-panic" : "bg-ice",
+                  vibeStyles.fill,
                 )}
                 style={{ width: `${asset.vibe}%` }}
               />
@@ -498,12 +621,15 @@ function PlaygroundPage() {
           </BentoCard>
 
           {/* Card 2 — Live number flow ticker */}
-          <BentoCard className="md:col-span-2">
+          <BentoCard tone={changeSentiment(asset.change)} className="md:col-span-2">
             <span className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
               Live ticker
             </span>
             <div className="mt-4 flex flex-col gap-3">
-              <PriceFlow value={asset.price} className={isPanic ? "text-panic" : "text-ice"} />
+              <PriceFlow
+                value={asset.price}
+                className={SENTIMENT_STYLES[changeSentiment(asset.change)].text}
+              />
               <ChangeFlow value={asset.change} className="self-start" />
               <div className="mt-2 border-t border-border pt-3">
                 <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -517,7 +643,7 @@ function PlaygroundPage() {
           </BentoCard>
 
           {/* Card 3 — Human explanation */}
-          <BentoCard className="md:col-span-3">
+          <BentoCard tone={vibe.tone} className="md:col-span-3">
             <span className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
               <Brain className="size-3.5" />
               The human explanation
@@ -536,28 +662,28 @@ function PlaygroundPage() {
                 label="Volatility"
                 value={asset.volatility}
                 icon={Activity}
-                tone={asset.volatility > 60 ? "panic" : "ice"}
+                tone={asset.volatility > 60 ? "panic" : "neutral"}
                 hint="Realised 24h band"
               />
               <ProgressMetricCard
                 label="Liquidations"
                 value={asset.liquidations}
                 icon={Flame}
-                tone={asset.liquidations > 40 ? "panic" : "ice"}
+                tone={asset.liquidations > 40 ? "panic" : "neutral"}
                 hint="Forced-exit pressure"
               />
               <ProgressMetricCard
                 label="Social velocity"
                 value={asset.socialVelocity}
                 icon={Zap}
-                tone={isPanic ? "panic" : "ice"}
+                tone={vibe.tone}
                 hint="Mentions per minute index"
               />
               <ProgressMetricCard
                 label="Calm aura"
                 value={Math.max(0, 100 - asset.volatility)}
                 icon={Waves}
-                tone="ice"
+                tone={asset.volatility > 60 ? "panic" : "bullish"}
                 hint="Inverse of chaos signal"
               />
             </div>

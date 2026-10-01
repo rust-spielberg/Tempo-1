@@ -5,8 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * TEMPO design system — obsidian canvas, Dark Ice Blue euphoria, Crimson panic.
- * All colors are semantic tokens in oklch. Never hardcode colors in components.
+ * TEMPO design system — obsidian canvas, bullish green, neutral ice, panic red.
+ * Keep sentiment colors semantic here; components should use their theme tokens.
  */
 
 @theme inline {
@@ -35,6 +35,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-bullish: var(--bullish);
+  --color-sentiment-neutral: var(--sentiment-neutral);
   --color-ice: var(--ice);
   --color-ice-deep: var(--ice-deep);
   --color-panic: var(--panic);
@@ -44,8 +46,8 @@
   --color-mono-dim: var(--mono-dim);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
-  --color-chart-1: var(--ice);
-  --color-chart-2: var(--ice-deep);
+  --color-chart-1: var(--bullish);
+  --color-chart-2: var(--ice);
   --color-chart-3: var(--panic);
   --color-chart-4: var(--panic-deep);
   --color-chart-5: var(--muted-foreground);
@@ -67,7 +69,7 @@
   --card-foreground: oklch(0.955 0.005 240);
   --popover: oklch(0.192 0.008 260);
   --popover-foreground: oklch(0.955 0.005 240);
-  --primary: oklch(0.898 0.111 200.5);
+  --primary: var(--sentiment-neutral);
   --primary-foreground: oklch(0.16 0.01 250);
   --secondary: oklch(0.242 0.01 258);
   --secondary-foreground: oklch(0.955 0.005 240);
@@ -75,17 +77,21 @@
   --muted-foreground: oklch(0.672 0.015 250);
   --accent: oklch(0.27 0.02 250);
   --accent-foreground: oklch(0.955 0.005 240);
-  --destructive: oklch(0.55 0.215 20.5);
+  --destructive: var(--panic);
   --destructive-foreground: oklch(0.97 0.01 240);
   --border: oklch(0.225 0 0);
   --input: oklch(0.268 0.01 258);
-  --ring: oklch(0.898 0.111 200.5);
+  --ring: var(--sentiment-neutral);
 
-  --ice: oklch(0.898 0.111 200.5);
+  --bullish: #22c55e;
+  --bullish-deep: #15803d;
+  --sentiment-neutral: #7df9ff;
+  --ice: var(--sentiment-neutral);
   --ice-deep: oklch(0.66 0.11 210);
-  --panic: oklch(0.55 0.215 20.5);
-  --panic-deep: oklch(0.42 0.18 22);
+  --panic: #ef4444;
+  --panic-deep: #b91c1c;
 
+  --gradient-bullish: linear-gradient(135deg, var(--bullish), var(--bullish-deep));
   --gradient-ice: linear-gradient(135deg, var(--ice), var(--ice-deep));
   --gradient-panic: linear-gradient(135deg, var(--panic), var(--panic-deep));
   --gradient-obsidian: radial-gradient(
@@ -93,12 +99,18 @@
     oklch(0.24 0.02 250) 0%,
     var(--background) 55%
   );
-  --glow-ice: 0 0 0 1px color-mix(in oklab, var(--ice) 28%, transparent),
+  --glow-bullish:
+    0 0 0 1px color-mix(in oklab, var(--bullish) 28%, transparent),
+    0 0 32px -6px color-mix(in oklab, var(--bullish) 45%, transparent);
+  --glow-ice:
+    0 0 0 1px color-mix(in oklab, var(--ice) 28%, transparent),
     0 0 32px -6px color-mix(in oklab, var(--ice) 45%, transparent);
-  --glow-panic: 0 0 0 1px color-mix(in oklab, var(--panic) 32%, transparent),
+  --glow-panic:
+    0 0 0 1px color-mix(in oklab, var(--panic) 32%, transparent),
     0 0 32px -6px color-mix(in oklab, var(--panic) 50%, transparent);
-  --shadow-recess: inset 0 1px 0 0 color-mix(in oklab, white 6%, transparent),
-    inset 0 -18px 32px -24px black, 0 18px 40px -28px black;
+  --shadow-recess:
+    inset 0 1px 0 0 color-mix(in oklab, white 6%, transparent), inset 0 -18px 32px -24px black,
+    0 18px 40px -28px black;
 }
 
 .dark {
@@ -140,12 +152,22 @@
   box-shadow: var(--glow-ice);
 }
 
+@utility glow-bullish {
+  box-shadow: var(--glow-bullish);
+}
+
 @utility glow-panic {
   box-shadow: var(--glow-panic);
 }
 
 @utility text-gradient-ice {
   background-image: var(--gradient-ice);
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-gradient-bullish {
+  background-image: var(--gradient-bullish);
   background-clip: text;
   color: transparent;
 }

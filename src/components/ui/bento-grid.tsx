@@ -2,14 +2,9 @@ import { motion } from "motion/react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import type { SentimentTone } from "@/lib/tempo-data";
 
-export function BentoGrid({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function BentoGrid({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <motion.div
       initial="hidden"
@@ -33,7 +28,7 @@ export function BentoCard({
 }: {
   children: ReactNode;
   className?: string;
-  tone?: "neutral" | "ice" | "panic";
+  tone?: SentimentTone;
 }) {
   return (
     <motion.div
@@ -43,8 +38,9 @@ export function BentoCard({
       }}
       className={cn(
         "panel relative overflow-hidden p-5 transition-shadow duration-500",
-        tone === "ice" && "glow-ice",
-        tone === "panic" && "glow-panic",
+        tone === "bullish" && "border-bullish/30 glow-bullish",
+        tone === "neutral" && "border-ice/30 glow-ice",
+        tone === "panic" && "border-panic/30 glow-panic",
         className,
       )}
     >

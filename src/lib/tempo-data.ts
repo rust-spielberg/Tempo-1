@@ -1,5 +1,6 @@
 export type EvidenceTag = "Bullish" | "Bearish" | "FUD";
 export type AssetCategory = "crypto" | "forex";
+export type SentimentTone = "bullish" | "neutral" | "panic";
 
 export type Evidence = {
   source: string;
@@ -131,10 +132,16 @@ export const ASSETS: Asset[] = [...CRYPTO_ASSETS, ...FOREX_ASSETS];
 
 export const DEFAULT_WATCHLIST_IDS = ["crypto-btc", "crypto-eth", "crypto-sol", "crypto-xrp", "forex-eur-usd", "forex-usd-jpy"];
 
-export function vibeLabel(vibe: number): { label: string; tone: "ice" | "panic" } {
-  if (vibe >= 75) return { label: "Silent Accumulation", tone: "ice" };
-  if (vibe >= 60) return { label: "Steady Conviction", tone: "ice" };
-  if (vibe >= 45) return { label: "Calm Drift", tone: "ice" };
+export function changeSentiment(change: number): SentimentTone {
+  if (change > 0.1) return "bullish";
+  if (change < -0.1) return "panic";
+  return "neutral";
+}
+
+export function vibeLabel(vibe: number): { label: string; tone: SentimentTone } {
+  if (vibe >= 75) return { label: "Silent Euphoria", tone: "bullish" };
+  if (vibe >= 60) return { label: "Steady Conviction", tone: "bullish" };
+  if (vibe >= 45) return { label: "Calm Drift", tone: "neutral" };
   if (vibe >= 30) return { label: "Rising Fear", tone: "panic" };
   return { label: "Severe Panic", tone: "panic" };
 }

@@ -1,6 +1,7 @@
 import NumberFlow from "@number-flow/react";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 
+import { changeSentiment } from "@/lib/tempo-data";
 import { cn } from "@/lib/utils";
 
 export function PriceFlow({
@@ -25,23 +26,19 @@ export function PriceFlow({
   );
 }
 
-export function ChangeFlow({
-  value,
-  className,
-}: {
-  value: number;
-  className?: string;
-}) {
-  const positive = value >= 0;
-  const Icon = positive ? ArrowUpRight : ArrowDownRight;
+export function ChangeFlow({ value, className }: { value: number; className?: string }) {
+  const tone = changeSentiment(value);
+  const Icon = tone === "bullish" ? ArrowUpRight : tone === "panic" ? ArrowDownRight : Minus;
 
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-sm font-semibold tabular-nums",
-        positive
-          ? "bg-ice/10 text-ice"
-          : "bg-panic/12 text-panic",
+        tone === "bullish"
+          ? "bg-bullish/10 text-bullish"
+          : tone === "panic"
+            ? "bg-panic/12 text-panic"
+            : "bg-ice/10 text-ice",
         className,
       )}
     >
