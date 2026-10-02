@@ -62,7 +62,7 @@ To spin up TEMPO locally:
    git clone [https://github.com/rust-spielberg/Tempo-1.git](https://github.com/rust-spielberg/Tempo-1.git)
    cd Tempo-1
 
-# ⚡ TEMPO — Cyber-Terminal Market Intelligence
+# ⚡ TEMPO — Cyber-Terminal Market Intelligence 🖥️ 
 
 > *Translating market chaos and live sentiment telemetry into human emotional metrics.*
 
