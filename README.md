@@ -73,6 +73,10 @@ To spin up TEMPO locally:
    ```bash
    git clone [https://github.com/rust-spielberg/Tempo-1.git](https://github.com/rust-spielberg/Tempo-1.git)
    cd Tempo-1
+   
+   npm install
+   
+   npm run dev
 
 # ⚡ TEMPO — Cyber-Terminal Market Intelligence
 
