@@ -1,4 +1,4 @@
-# ⚡ TEMPO — Cyber-Terminal Market Intelligence
+# ⚡ TEMPO V1 — Cyber-Terminal Market Intelligence
 
 > *Translating market chaos and live sentiment telemetry into human emotional metrics.*
 
