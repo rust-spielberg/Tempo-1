@@ -4,7 +4,7 @@
 
 [![Live Demo](https://img.shields.io/badge/status-live-emerald?style=for-the-badge&logo=vercel)](https://tempo-1-385ibimgq-spielbergs.vercel.app/)
 
-**Live URL:** [https://tempo-1-385ibimgq-spielbergs.vercel.app/](https://tempo-1-385ibimgq-spielbergs.vercel.app/)
+**Live URL:** [https://tempo-1-tau.vercel.app/]
 
 ---
 
@@ -80,6 +80,6 @@ To spin up TEMPO locally:
 
 [![Live Demo](https://img.shields.io/badge/status-live-emerald?style=for-the-badge&logo=vercel)](https://tempo-1-385ibimgq-spielbergs.vercel.app/)
 
-**Live Application URL:** [https://tempo-1-385ibimgq-spielbergs.vercel.app/](https://tempo-1-385ibimgq-spielbergs.vercel.app/)
+**Live Application URL:** [https://tempo-1-tau.vercel.app/]
 
 ---
